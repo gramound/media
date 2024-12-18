@@ -56,6 +56,7 @@ import androidx.media3.exoplayer.offline.DownloadRequest;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ads.AdsLoader;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.exoplayer.util.DebugTextViewHelper;
 import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.ui.PlayerView;
@@ -276,6 +277,7 @@ public class PlayerActivity extends AppCompatActivity
               .setMediaSourceFactory(createMediaSourceFactory());
       setRenderersFactory(
           playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
+      setTrackSelector(playerBuilder, intent.getBooleanExtra(IntentUtil.TUNNELING_EXTRA, false));
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());
@@ -332,6 +334,17 @@ public class PlayerActivity extends AppCompatActivity
     RenderersFactory renderersFactory =
         DemoUtil.buildRenderersFactory(/* context= */ this, preferExtensionDecoders);
     playerBuilder.setRenderersFactory(renderersFactory);
+  }
+
+  @OptIn(markerClass = UnstableApi.class)
+  private void setTrackSelector(ExoPlayer.Builder playerBuilder, boolean tunneling) {
+    DefaultTrackSelector trackSelector = new DefaultTrackSelector(/* context= */ this);
+    if (tunneling) {
+      trackSelector.setParameters(
+          trackSelector.buildUponParameters().setTunnelingEnabled(true)
+      );
+    }
+    playerBuilder.setTrackSelector(trackSelector);
   }
 
   private void configurePlayerWithServerSideAdsLoader() {

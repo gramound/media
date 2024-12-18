@@ -69,4 +69,6 @@
 
   <string name="track_selection_title_image">Image</string>
 
+  <string name="tunneling">Request multimedia tunneling</string>
+
 </resources>
