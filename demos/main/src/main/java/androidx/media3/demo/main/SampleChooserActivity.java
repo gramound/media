@@ -91,6 +91,7 @@ public class SampleChooserActivity extends AppCompatActivity
   private DownloadTracker downloadTracker;
   private SampleAdapter sampleAdapter;
   private MenuItem preferExtensionDecodersMenuItem;
+  private MenuItem tunnelingMenuItem;
   private ExpandableListView sampleListView;
   @Nullable private MediaItem downloadMediaItemWaitingForNotificationPermission;
   private boolean notificationPermissionToastShown;
@@ -153,6 +154,10 @@ public class SampleChooserActivity extends AppCompatActivity
     inflater.inflate(R.menu.sample_chooser_menu, menu);
     preferExtensionDecodersMenuItem = menu.findItem(R.id.prefer_extension_decoders);
     preferExtensionDecodersMenuItem.setVisible(useExtensionRenderers);
+    tunnelingMenuItem = menu.findItem(R.id.tunneling);
+    if (Util.SDK_INT < 21) {
+      tunnelingMenuItem.setEnabled(false);
+    }
     return true;
   }
 
@@ -238,6 +243,7 @@ public class SampleChooserActivity extends AppCompatActivity
     intent.putExtra(
         IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA,
         isNonNullAndChecked(preferExtensionDecodersMenuItem));
+    intent.putExtra(IntentUtil.TUNNELING_EXTRA, isNonNullAndChecked(tunnelingMenuItem));
     IntentUtil.addToIntent(playlistHolder.mediaItems, intent);
     startActivity(intent);
     return true;
