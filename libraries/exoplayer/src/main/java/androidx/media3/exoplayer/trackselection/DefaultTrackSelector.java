@@ -906,6 +906,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
       // General
       private boolean exceedRendererCapabilitiesIfNecessary;
       private boolean tunnelingEnabled;
+      private boolean allowVideoOnlyTunneling;
       private boolean allowMultipleAdaptiveSelections;
       private boolean allowInvalidateSelectionsOnRendererCapabilitiesChange;
       // Overrides
@@ -956,6 +957,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
         // General
         exceedRendererCapabilitiesIfNecessary = initialValues.exceedRendererCapabilitiesIfNecessary;
         tunnelingEnabled = initialValues.tunnelingEnabled;
+        allowVideoOnlyTunneling = initialValues.allowVideoOnlyTunneling;
         allowMultipleAdaptiveSelections = initialValues.allowMultipleAdaptiveSelections;
         allowInvalidateSelectionsOnRendererCapabilitiesChange =
             initialValues.allowInvalidateSelectionsOnRendererCapabilitiesChange;
@@ -1022,6 +1024,10 @@ public class DefaultTrackSelector extends MappingTrackSelector
                 defaultValue.exceedRendererCapabilitiesIfNecessary));
         setTunnelingEnabled(
             bundle.getBoolean(Parameters.FIELD_TUNNELING_ENABLED, defaultValue.tunnelingEnabled));
+        setAllowVideoOnlyTunneling(
+            bundle.getBoolean(
+                Parameters.FIELD_ALLOW_VIDEO_ONLY_TUNNELING,
+                defaultValue.allowVideoOnlyTunneling));
         setAllowMultipleAdaptiveSelections(
             bundle.getBoolean(
                 Parameters.FIELD_ALLOW_MULTIPLE_ADAPTIVE_SELECTIONS,
@@ -1643,6 +1649,18 @@ public class DefaultTrackSelector extends MappingTrackSelector
       }
 
       /**
+       * Sets whether tunneling without an audio track is allowed.
+       *
+       * @param allowVideoOnlyTunneling Whether video-only tunneling is allowed.
+       * @return This builder.
+       */
+      @CanIgnoreReturnValue
+      public Builder setAllowVideoOnlyTunneling(boolean allowVideoOnlyTunneling) {
+        this.allowVideoOnlyTunneling = allowVideoOnlyTunneling;
+        return this;
+      }
+
+      /**
        * Sets whether multiple adaptive selections with more than one track are allowed.
        *
        * @param allowMultipleAdaptiveSelections Whether multiple adaptive selections are allowed.
@@ -1806,6 +1824,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
         // General
         exceedRendererCapabilitiesIfNecessary = true;
         tunnelingEnabled = false;
+        allowVideoOnlyTunneling = false;
         allowMultipleAdaptiveSelections = true;
         allowInvalidateSelectionsOnRendererCapabilitiesChange = false;
       }
@@ -1978,6 +1997,12 @@ public class DefaultTrackSelector extends MappingTrackSelector
     public final boolean tunnelingEnabled;
 
     /**
+     * Whether tunneling without an audio track is allowed.
+     * The default value is {@code false}.
+     */
+    public final boolean allowVideoOnlyTunneling;
+
+    /**
      * Whether multiple adaptive selections with more than one track are allowed. The default value
      * is {@code true}.
      *
@@ -2017,6 +2042,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
       // General
       exceedRendererCapabilitiesIfNecessary = builder.exceedRendererCapabilitiesIfNecessary;
       tunnelingEnabled = builder.tunnelingEnabled;
+      allowVideoOnlyTunneling = builder.allowVideoOnlyTunneling;
       allowMultipleAdaptiveSelections = builder.allowMultipleAdaptiveSelections;
       allowInvalidateSelectionsOnRendererCapabilitiesChange =
           builder.allowInvalidateSelectionsOnRendererCapabilitiesChange;
@@ -2110,6 +2136,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
           // General
           && exceedRendererCapabilitiesIfNecessary == other.exceedRendererCapabilitiesIfNecessary
           && tunnelingEnabled == other.tunnelingEnabled
+          && allowVideoOnlyTunneling == other.allowVideoOnlyTunneling
           && allowMultipleAdaptiveSelections == other.allowMultipleAdaptiveSelections
           && allowInvalidateSelectionsOnRendererCapabilitiesChange
               == other.allowInvalidateSelectionsOnRendererCapabilitiesChange
@@ -2138,6 +2165,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
       // General
       result = 31 * result + (exceedRendererCapabilitiesIfNecessary ? 1 : 0);
       result = 31 * result + (tunnelingEnabled ? 1 : 0);
+      result = 31 * result + (allowVideoOnlyTunneling ? 1 : 0);
       result = 31 * result + (allowMultipleAdaptiveSelections ? 1 : 0);
       result = 31 * result + (allowInvalidateSelectionsOnRendererCapabilitiesChange ? 1 : 0);
       // Overrides (omitted from hashCode).
@@ -2182,6 +2210,8 @@ public class DefaultTrackSelector extends MappingTrackSelector
         Util.intToStringMaxRadix(FIELD_CUSTOM_ID_BASE + 17);
     private static final String FIELD_ALLOW_AUDIO_NON_SEAMLESS_ADAPTIVENESS =
         Util.intToStringMaxRadix(FIELD_CUSTOM_ID_BASE + 18);
+    private static final String FIELD_ALLOW_VIDEO_ONLY_TUNNELING =
+        Util.intToStringMaxRadix(FIELD_CUSTOM_ID_BASE + 19);
 
     @Override
     public Bundle toBundle() {
@@ -2219,6 +2249,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
       bundle.putBoolean(
           FIELD_EXCEED_RENDERER_CAPABILITIES_IF_NECESSARY, exceedRendererCapabilitiesIfNecessary);
       bundle.putBoolean(FIELD_TUNNELING_ENABLED, tunnelingEnabled);
+      bundle.putBoolean(FIELD_ALLOW_VIDEO_ONLY_TUNNELING, allowVideoOnlyTunneling);
       bundle.putBoolean(FIELD_ALLOW_MULTIPLE_ADAPTIVE_SELECTIONS, allowMultipleAdaptiveSelections);
       bundle.putBoolean(
           FIELD_ALLOW_INVALIDATE_SELECTIONS_ON_RENDERER_CAPABILITIES_CHANGE,
@@ -2719,7 +2750,8 @@ public class DefaultTrackSelector extends MappingTrackSelector
     // Configure audio and video renderers to use tunneling if appropriate.
     if (parameters.tunnelingEnabled) {
       maybeConfigureRenderersForTunneling(
-          mappedTrackInfo, rendererFormatSupports, rendererConfigurations, rendererTrackSelections);
+          mappedTrackInfo, rendererFormatSupports, rendererConfigurations, rendererTrackSelections,
+          parameters.allowVideoOnlyTunneling);
     }
 
     // Configure audio renderer to use offload if appropriate.
@@ -3264,12 +3296,14 @@ public class DefaultTrackSelector extends MappingTrackSelector
    * @param rendererConfigurations The renderer configurations. Configurations may be replaced with
    *     ones that enable tunneling as a result of this call.
    * @param trackSelections The renderer track selections.
+   * @param allowVideoOnlyTunneling Whether an audio track is required for tunneling.
    */
   private static void maybeConfigureRenderersForTunneling(
       MappedTrackInfo mappedTrackInfo,
       @Capabilities int[][][] rendererFormatSupports,
       @NullableType RendererConfiguration[] rendererConfigurations,
-      @NullableType ExoTrackSelection[] trackSelections) {
+      @NullableType ExoTrackSelection[] trackSelections,
+      boolean allowVideoOnlyTunneling) {
     // Check whether we can enable tunneling. To enable tunneling we require exactly one audio and
     // one video renderer to support tunneling and have a selection.
     int tunnelingAudioRendererIndex = -1;
@@ -3300,11 +3334,14 @@ public class DefaultTrackSelector extends MappingTrackSelector
         }
       }
     }
-    enableTunneling &= tunnelingAudioRendererIndex != -1 && tunnelingVideoRendererIndex != -1;
+    enableTunneling &= (allowVideoOnlyTunneling || tunnelingAudioRendererIndex != -1) &&
+        tunnelingVideoRendererIndex != -1;
     if (enableTunneling) {
       RendererConfiguration tunnelingRendererConfiguration =
           new RendererConfiguration(AudioSink.OFFLOAD_MODE_DISABLED, /* tunneling= */ true);
-      rendererConfigurations[tunnelingAudioRendererIndex] = tunnelingRendererConfiguration;
+      if (tunnelingAudioRendererIndex != -1) {
+        rendererConfigurations[tunnelingAudioRendererIndex] = tunnelingRendererConfiguration;
+      }
       rendererConfigurations[tunnelingVideoRendererIndex] = tunnelingRendererConfiguration;
     }
   }
