@@ -3195,9 +3195,24 @@ import java.util.function.IntConsumer;
   private void onAudioSessionIdChanged(int oldAudioSessionId, int newAudioSessionId) {
     verifyApplicationThread();
     sendRendererMessage(TRACK_TYPE_AUDIO, MSG_SET_AUDIO_SESSION_ID, newAudioSessionId);
-    sendRendererMessage(TRACK_TYPE_VIDEO, MSG_SET_AUDIO_SESSION_ID, newAudioSessionId);
+    // Only send audio session ID to video renderer if an audio track is selected.
+    // For video-only tunneling, we must not set the audio session ID on the video renderer
+    // to prevent MediaCodec from setting the "audio-hw-sync" parameter.
+    if (hasAudioTrackSelected()) {
+      sendRendererMessage(TRACK_TYPE_VIDEO, MSG_SET_AUDIO_SESSION_ID, newAudioSessionId);
+    }
     listeners.sendEvent(
         EVENT_AUDIO_SESSION_ID, listener -> listener.onAudioSessionIdChanged(newAudioSessionId));
+  }
+
+  private boolean hasAudioTrackSelected() {
+    for (int i = 0; i < playbackInfo.trackSelectorResult.length; i++) {
+      if (getRendererType(i) == C.TRACK_TYPE_AUDIO
+          && playbackInfo.trackSelectorResult.selections[i] != null) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static DeviceInfo createDeviceInfo(@Nullable StreamVolumeManager streamVolumeManager) {

@@ -913,7 +913,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
       throws ExoPlaybackException {
     super.onEnabled(joining, mayRenderStartOfStream);
     boolean tunneling = getConfiguration().tunneling;
-    checkState(!tunneling || tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET);
+    // For video-only tunneling (no audio track), tunnelingAudioSessionId will be AUDIO_SESSION_ID_UNSET.
+    // This is valid and allows tunneling without the audio-hw-sync parameter.
     if (this.tunneling != tunneling) {
       this.tunneling = tunneling;
       releaseCodec();
@@ -2577,9 +2578,13 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
       mediaFormat.setInteger("no-post-process", 1);
       mediaFormat.setInteger("auto-frc", 0);
     }
-    if (tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+    if (tunneling) {
       mediaFormat.setFeatureEnabled(CodecCapabilities.FEATURE_TunneledPlayback, true);
-      mediaFormat.setInteger(MediaFormat.KEY_AUDIO_SESSION_ID, tunnelingAudioSessionId);
+      // Only set audio session ID if it's valid (not UNSET). For video-only tunneling,
+      // we enable tunneling without setting the audio session ID to avoid the audio-hw-sync parameter.
+      if (tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+        mediaFormat.setInteger(MediaFormat.KEY_AUDIO_SESSION_ID, tunnelingAudioSessionId);
+      }
     }
     if (SDK_INT >= 35) {
       mediaFormat.setInteger(MediaFormat.KEY_IMPORTANCE, max(0, -rendererPriority));
