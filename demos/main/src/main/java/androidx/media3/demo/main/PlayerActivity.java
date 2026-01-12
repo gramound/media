@@ -341,7 +341,9 @@ public class PlayerActivity extends AppCompatActivity
     DefaultTrackSelector trackSelector = new DefaultTrackSelector(/* context= */ this);
     if (tunneling) {
       trackSelector.setParameters(
-          trackSelector.buildUponParameters().setTunnelingEnabled(true)
+          trackSelector.buildUponParameters()
+              .setTunnelingEnabled(true)
+              .setAllowVideoOnlyTunneling(true)
       );
     }
     playerBuilder.setTrackSelector(trackSelector);
