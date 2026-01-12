@@ -246,6 +246,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 
   private boolean tunneling;
   private int tunnelingAudioSessionId;
+  private boolean hasReceivedAudioSessionIdMessage;
   /* package */ @Nullable OnFrameRenderedListener tunnelingOnFrameRenderedListener;
   @Nullable private VideoFrameMetadataListener frameMetadataListener;
   private long startPositionUs;
@@ -914,7 +915,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
       throws ExoPlaybackException {
     super.onEnabled(joining, mayRenderStartOfStream);
     boolean tunneling = getConfiguration().tunneling;
-    checkState(!tunneling || tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET);
+    // For video-only tunneling (no audio track), tunnelingAudioSessionId will be AUDIO_SESSION_ID_UNSET.
+    // This is valid and allows tunneling without the audio-hw-sync parameter.
     if (this.tunneling != tunneling) {
       this.tunneling = tunneling;
       releaseCodec();
@@ -1190,6 +1192,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
     maybeSetupTunnelingForFirstFrame();
     haveReportedFirstFrameRenderedForCurrentSurface = false;
     tunnelingOnFrameRenderedListener = null;
+    hasReceivedAudioSessionIdMessage = false;
     isFlushRequired = true;
     nextOutputBufferToProcessPresentationTimeUs = C.TIME_UNSET;
     try {
@@ -1250,9 +1253,12 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
         break;
       case MSG_SET_AUDIO_SESSION_ID:
         int tunnelingAudioSessionId = (int) checkNotNull(message);
+        hasReceivedAudioSessionIdMessage = true;
         if (this.tunnelingAudioSessionId != tunnelingAudioSessionId) {
           this.tunnelingAudioSessionId = tunnelingAudioSessionId;
-          if (tunneling) {
+          // Release codec if tunneling is enabled and codec is already initialized.
+          // The codec will be reinitialized with the new audio session ID.
+          if (tunneling && getCodec() != null) {
             releaseCodec();
           }
         }
@@ -1355,6 +1361,11 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 
   @Override
   protected boolean shouldInitCodec(MediaCodecInfo codecInfo) {
+    // For tunneling, wait for the audio session ID message before initializing the codec.
+    // This ensures the codec is configured with the correct audio session ID from the start.
+    if (tunneling && !hasReceivedAudioSessionIdMessage) {
+      return false;
+    }
     return hasSurfaceForCodec(codecInfo);
   }
 
@@ -2585,9 +2596,13 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
       mediaFormat.setInteger("no-post-process", 1);
       mediaFormat.setInteger("auto-frc", 0);
     }
-    if (tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+    if (tunneling) {
       mediaFormat.setFeatureEnabled(CodecCapabilities.FEATURE_TunneledPlayback, true);
-      mediaFormat.setInteger(MediaFormat.KEY_AUDIO_SESSION_ID, tunnelingAudioSessionId);
+      // Only set audio session ID if it's valid (not UNSET). For video-only tunneling,
+      // we enable tunneling without setting the audio session ID to avoid the audio-hw-sync parameter.
+      if (tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+        mediaFormat.setInteger(MediaFormat.KEY_AUDIO_SESSION_ID, tunnelingAudioSessionId);
+      }
     }
     if (SDK_INT >= 35) {
       mediaFormat.setInteger(MediaFormat.KEY_IMPORTANCE, max(0, -rendererPriority));

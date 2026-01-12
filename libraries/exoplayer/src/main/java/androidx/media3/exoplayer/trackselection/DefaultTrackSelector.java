@@ -3270,8 +3270,8 @@ public class DefaultTrackSelector extends MappingTrackSelector
       @Capabilities int[][][] rendererFormatSupports,
       @NullableType RendererConfiguration[] rendererConfigurations,
       @NullableType ExoTrackSelection[] trackSelections) {
-    // Check whether we can enable tunneling. To enable tunneling we require exactly one audio and
-    // one video renderer to support tunneling and have a selection.
+    // Check whether we can enable tunneling. To enable tunneling we require exactly one video
+    // renderer (and optionally one audio renderer) that supports tunneling and has a selection.
     int tunnelingAudioRendererIndex = -1;
     int tunnelingVideoRendererIndex = -1;
     boolean enableTunneling = true;
@@ -3300,11 +3300,13 @@ public class DefaultTrackSelector extends MappingTrackSelector
         }
       }
     }
-    enableTunneling &= tunnelingAudioRendererIndex != -1 && tunnelingVideoRendererIndex != -1;
+    enableTunneling &= tunnelingVideoRendererIndex != -1;
     if (enableTunneling) {
       RendererConfiguration tunnelingRendererConfiguration =
           new RendererConfiguration(AudioSink.OFFLOAD_MODE_DISABLED, /* tunneling= */ true);
-      rendererConfigurations[tunnelingAudioRendererIndex] = tunnelingRendererConfiguration;
+      if (tunnelingAudioRendererIndex != -1) {
+        rendererConfigurations[tunnelingAudioRendererIndex] = tunnelingRendererConfiguration;
+      }
       rendererConfigurations[tunnelingVideoRendererIndex] = tunnelingRendererConfiguration;
     }
   }

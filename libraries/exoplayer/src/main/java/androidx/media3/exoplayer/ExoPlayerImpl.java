@@ -2345,6 +2345,14 @@ import java.util.function.IntConsumer;
     }
     if (previousPlaybackInfo.trackSelectorResult != newPlaybackInfo.trackSelectorResult) {
       trackSelector.onSelectionActivated(newPlaybackInfo.trackSelectorResult.info);
+      // Update audio session ID for video renderer based on whether an audio track is selected.
+      // For video-only tunneling, send UNSET to prevent the audio-hw-sync parameter.
+      // For audio+video tunneling, send the actual audio session ID.
+      // The video renderer will reinitialize the codec if the audio session ID changes.
+      boolean hasAudio = hasAudioTrackSelected();
+      int currentAudioSessionId = audioSessionIdState.get();
+      int audioSessionIdForVideoRenderer = hasAudio ? currentAudioSessionId : C.AUDIO_SESSION_ID_UNSET;
+      sendRendererMessage(TRACK_TYPE_VIDEO, MSG_SET_AUDIO_SESSION_ID, audioSessionIdForVideoRenderer);
       listeners.queueEvent(
           Player.EVENT_TRACKS_CHANGED,
           listener -> listener.onTracksChanged(newPlaybackInfo.trackSelectorResult.tracks));
@@ -3195,9 +3203,27 @@ import java.util.function.IntConsumer;
   private void onAudioSessionIdChanged(int oldAudioSessionId, int newAudioSessionId) {
     verifyApplicationThread();
     sendRendererMessage(TRACK_TYPE_AUDIO, MSG_SET_AUDIO_SESSION_ID, newAudioSessionId);
-    sendRendererMessage(TRACK_TYPE_VIDEO, MSG_SET_AUDIO_SESSION_ID, newAudioSessionId);
+    // Only send audio session ID to video renderer if tracks have been selected.
+    // If tracks haven't been selected yet, updatePlaybackInfo will send it when they are.
+    // This prevents sending UNSET initially and then the correct value later, which would
+    // cause an unnecessary codec release and reinitialization.
+    if (playbackInfo.trackSelectorResult != emptyTrackSelectorResult) {
+      boolean hasAudio = hasAudioTrackSelected();
+      int audioSessionIdForVideoRenderer = hasAudio ? newAudioSessionId : C.AUDIO_SESSION_ID_UNSET;
+      sendRendererMessage(TRACK_TYPE_VIDEO, MSG_SET_AUDIO_SESSION_ID, audioSessionIdForVideoRenderer);
+    }
     listeners.sendEvent(
         EVENT_AUDIO_SESSION_ID, listener -> listener.onAudioSessionIdChanged(newAudioSessionId));
+  }
+
+  private boolean hasAudioTrackSelected() {
+    for (int i = 0; i < playbackInfo.trackSelectorResult.length; i++) {
+      if (getRendererType(i) == C.TRACK_TYPE_AUDIO
+          && playbackInfo.trackSelectorResult.selections[i] != null) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static DeviceInfo createDeviceInfo(@Nullable StreamVolumeManager streamVolumeManager) {
