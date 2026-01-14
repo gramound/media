@@ -245,6 +245,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 
   private boolean tunneling;
   private int tunnelingAudioSessionId;
+  private boolean hasReceivedAudioSessionIdMessage;
   /* package */ @Nullable OnFrameRenderedListener tunnelingOnFrameRenderedListener;
   @Nullable private VideoFrameMetadataListener frameMetadataListener;
   private long startPositionUs;
@@ -1190,6 +1191,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
     maybeSetupTunnelingForFirstFrame();
     haveReportedFirstFrameRenderedForCurrentSurface = false;
     tunnelingOnFrameRenderedListener = null;
+    hasReceivedAudioSessionIdMessage = false;
     isFlushRequired = true;
     nextOutputBufferToProcessPresentationTimeUs = C.TIME_UNSET;
     try {
@@ -1250,9 +1252,12 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
         break;
       case MSG_SET_AUDIO_SESSION_ID:
         int tunnelingAudioSessionId = (int) checkNotNull(message);
+        hasReceivedAudioSessionIdMessage = true;
         if (this.tunnelingAudioSessionId != tunnelingAudioSessionId) {
           this.tunnelingAudioSessionId = tunnelingAudioSessionId;
-          if (tunneling) {
+          // Release codec if tunneling is enabled and codec is already initialized.
+          // The codec will be reinitialized with the new audio session ID.
+          if (tunneling && getCodec() != null) {
             releaseCodec();
           }
         }
@@ -1355,6 +1360,11 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 
   @Override
   protected boolean shouldInitCodec(MediaCodecInfo codecInfo) {
+    // For tunneling, wait for the audio session ID message before initializing the codec.
+    // This ensures the codec is configured with the correct audio session ID from the start.
+    if (tunneling && !hasReceivedAudioSessionIdMessage) {
+      return false;
+    }
     return hasSurfaceForCodec(codecInfo);
   }
 
