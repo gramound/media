@@ -277,7 +277,8 @@ public class PlayerActivity extends AppCompatActivity
               .setMediaSourceFactory(createMediaSourceFactory());
       setRenderersFactory(
           playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
-      setTrackSelector(playerBuilder, intent.getBooleanExtra(IntentUtil.TUNNELING_EXTRA, false));
+      setTrackSelector(playerBuilder, intent.getBooleanExtra(IntentUtil.TUNNELING_EXTRA, false),
+          intent.getBooleanExtra(IntentUtil.ALLOW_VIDEO_ONLY_TUNNELING_EXTRA, false));
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());
@@ -337,11 +338,13 @@ public class PlayerActivity extends AppCompatActivity
   }
 
   @OptIn(markerClass = UnstableApi.class)
-  private void setTrackSelector(ExoPlayer.Builder playerBuilder, boolean tunneling) {
+  private void setTrackSelector(
+      ExoPlayer.Builder playerBuilder, boolean tunneling, boolean allowVideoOnlyTunneling) {
     DefaultTrackSelector trackSelector = new DefaultTrackSelector(/* context= */ this);
     if (tunneling) {
       trackSelector.setParameters(
           trackSelector.buildUponParameters().setTunnelingEnabled(true)
+              .setAllowVideoOnlyTunneling(allowVideoOnlyTunneling)
       );
     }
     playerBuilder.setTrackSelector(trackSelector);

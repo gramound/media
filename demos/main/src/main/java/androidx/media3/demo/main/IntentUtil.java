@@ -49,6 +49,7 @@ public class IntentUtil {
   // Activity extras.
   public static final String PREFER_EXTENSION_DECODERS_EXTRA = "prefer_extension_decoders";
   public static final String TUNNELING_EXTRA = "tunneling";
+  public static final String ALLOW_VIDEO_ONLY_TUNNELING_EXTRA = "allow_video_only_tunneling";
 
   // Media item configuration extras.
 
